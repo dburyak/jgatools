@@ -1,7 +1,7 @@
 package dburyak.jgatools;
 
 
-import java.util.stream.Stream;
+import rx.Observable;
 
 
 /**
@@ -12,28 +12,24 @@ import java.util.stream.Stream;
  * <br/><b>Created on:</b> <i>12:24:33 AM Sep 3, 2016</i>
  * 
  * @author <i>Dmytro Buryak &ltdmytro.buryak@gmail.com&gt</i>
- * @version 0.1
+ * @version 0.2
+ * @param <C>
+ *            concrete implementation type of chromosome that this strategy works with
  */
-public interface ICrossoverStrategy {
+public interface ICrossoverStrategy<C extends IChromosome> {
 
     /**
-     * Perform crossover of given parents and produce offsprings.
-     * <br/><b>PRE-conditions:</b> non-null parent1, non-null parent2, non-null other
+     * Perform crossover of given parents and produce offsprings.<br/>
+     * Can trigger exceptions if given unexpected number of parents - too few or too much.
+     * <br/><b>PRE-conditions:</b> non-null parents and non-empty parents
      * <br/><b>POST-conditions:</b> non-null and non-empty result
      * <br/><b>Side-effects:</b> UNKNOWN
      * <br/><b>Created on:</b> <i>12:32:49 AM Sep 3, 2016</i>
      * 
-     * @param parent1
-     *            first parent for crossover
-     * @param parent2
-     *            second parent for crossover
-     * @param other
-     *            other parents for crossover
+     * @param parents
+     *            parents that participate in crossover
      * @return offsprings produced by this crossover
      */
-    public Stream<IChromosome> crossover(
-        final IChromosome parent1,
-        final IChromosome parent2,
-        final IChromosome... other);
+    public Observable<C> crossover(final Observable<C> parents);
 
 }

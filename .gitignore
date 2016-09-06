@@ -5,6 +5,8 @@ report.log
 test.system.log
 test.report.log
 
+# Temp and backup files #
+*~
 
 ### Gradle ###
 .gradle

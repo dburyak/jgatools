@@ -10,8 +10,12 @@ import java.time.Duration;
  * 
  * @author <i>Dmytro Buryak &ltdmytro.buryak@gmail.com&gt</i>
  * @version 0.1
+ * @param <C>
+ *            concrete chromosome implementation type this termination condition works with
+ * @param <P>
+ *            concrete population implementation type this termination condition works with
  */
-public interface ITerminationCondition {
+public interface ITerminationCondition<C extends IChromosome, P extends IPopulation<C>> {
 
     /**
      * Check if genetic algorithm should terminate.
@@ -28,6 +32,6 @@ public interface ITerminationCondition {
      *            time that GA is running
      * @return true if genetic algorithm should terminate, false if it needs to search further
      */
-    public boolean shouldTerminate(final IPopulation population, final int iteration, final Duration runtime);
+    public boolean shouldTerminate(final P population, final int iteration, final Duration runtime);
 
 }

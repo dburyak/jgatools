@@ -8,8 +8,10 @@ package dburyak.jgatools;
  * 
  * @author <i>Dmytro Buryak &ltdmytro.buryak@gmail.com&gt</i>
  * @version 0.1
+ * @param <C>
+ *            concrete implementation type of chromosome that this mutation strategy works with
  */
-public interface IMutationStrategy {
+public interface IMutationStrategy<C extends IChromosome> {
 
     /**
      * Apply mutation operation to given chromosome and produce a new one.
@@ -22,6 +24,6 @@ public interface IMutationStrategy {
      *            chromosome to be mutated
      * @return a brand new mutant chromosome
      */
-    public IChromosome mutate(final IChromosome chromosome);
+    public C mutate(final C chromosome);
 
 }

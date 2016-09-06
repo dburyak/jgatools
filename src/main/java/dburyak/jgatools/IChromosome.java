@@ -1,7 +1,6 @@
 package dburyak.jgatools;
 
 
-import java.util.function.Function;
 import java.util.stream.Stream;
 
 import javax.annotation.concurrent.Immutable;
@@ -90,7 +89,7 @@ public interface IChromosome {
      * 
      * @return stream of parent chromosomes
      */
-    public Stream<IChromosome> parents();
+    public Stream<? extends IChromosome> parents();
 
 
     /**
@@ -106,7 +105,7 @@ public interface IChromosome {
      *            type of {@link IChromosome} implementation this builder is dedicated to
      */
     @NotThreadSafe
-    public interface IChromosomeBuilder<C extends IChromosome, D extends Cloneable>
+    public static interface IChromosomeBuilder<C extends IChromosome, D extends Cloneable>
         extends
             InstanceBuilder<IChromosome> {
 
@@ -188,9 +187,9 @@ public interface IChromosome {
 
         /**
          * Set fitness for target chromosome.<br/>
-         * If fitness is not specified, then fitness function must be provided in {@link #fitnessFunc(Function)}.
-         * {@link #fitness(Fitness)} and {@link #fitnessFunc(Function)} are mutually exclusive and are two different
-         * ways to set fitness of target chromosome.
+         * If fitness is not specified, then fitness function must be provided in
+         * {@link #fitnessFunc(IFitnessFunction)}. {@link #fitness(Fitness)} and {@link #fitnessFunc(IFitnessFunction)}
+         * are mutually exclusive and are two different ways to set fitness of target chromosome.
          * <br/><b>PRE-conditions:</b> non-null fitness
          * <br/><b>POST-conditions:</b> non-null result
          * <br/><b>Side-effects:</b> UNKNOWN
@@ -206,18 +205,18 @@ public interface IChromosome {
          * Set fitness calculation function for target chromosome. This function is called by {@link #build()}
          * method.<br/>
          * If fitness function is not specified, then fitness should be specified manually by {@link #fitness(Fitness)}.
-         * {@link #fitnessFunc(Function)} and {@link #fitness(Fitness)} are mutually exclusive and are two different
-         * ways to set fitness of target chromosome.
+         * {@link #fitnessFunc(IFitnessFunction)} and {@link #fitness(Fitness)} are mutually exclusive and are two
+         * different ways to set fitness of target chromosome.
          * <br/><b>PRE-conditions:</b> non-null func
          * <br/><b>POST-conditions:</b> non-null result
          * <br/><b>Side-effects:</b> UNKNOWN
          * <br/><b>Created on:</b> <i>6:24:35 PM Sep 3, 2016</i>
          * 
-         * @param func
+         * @param fitnessFunc
          *            fitness calculation function
          * @return this builder (for call chaining)
          */
-        public IChromosomeBuilder<C, D> fitnessFunc(final Function<C, Fitness> func);
+        public IChromosomeBuilder<C, D> fitnessFunc(final IFitnessFunction<C> fitnessFunc);
 
         /**
          * Add parent to target chromosome.
@@ -230,7 +229,7 @@ public interface IChromosome {
          *            one of the parents of the target chromosome
          * @return this builder (for call chaining)
          */
-        public IChromosomeBuilder<C, D> parent(final IChromosome parent);
+        public IChromosomeBuilder<C, D> parent(final C parent);
 
     }
 

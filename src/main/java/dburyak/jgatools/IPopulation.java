@@ -1,14 +1,13 @@
 package dburyak.jgatools;
 
 
-import java.util.stream.Stream;
-
 import javax.annotation.concurrent.Immutable;
 import javax.annotation.concurrent.NotThreadSafe;
 
 import dburyak.jtools.IConfigurable;
 import dburyak.jtools.IConfigured;
 import dburyak.jtools.InstanceBuilder;
+import rx.Observable;
 
 
 /**
@@ -18,9 +17,11 @@ import dburyak.jtools.InstanceBuilder;
  * 
  * @author <i>Dmytro Buryak &ltdmytro.buryak@gmail.com&gt</i>
  * @version 0.1
+ * @param <C>
+ *            concrete implementation type of chromosome that this population works with
  */
 @Immutable
-public interface IPopulation extends IConfigured {
+public interface IPopulation<C extends IChromosome> extends IConfigured {
 
     /**
      * Get all chromosomes of this population. Sorting is not specified (implementation dependent).
@@ -29,9 +30,9 @@ public interface IPopulation extends IConfigured {
      * <br/><b>Side-effects:</b> UNKNOWN
      * <br/><b>Created on:</b> <i>11:47:16 PM Sep 3, 2016</i>
      * 
-     * @return all chromosomes of this population
+     * @return observable that emits all chromosomes of this population
      */
-    public Stream<IChromosome> chromosomes();
+    public Observable<C> chromosomes();
 
     /**
      * Get size of this population. It is always equal to number of chromosomes in stream returned by
@@ -66,7 +67,7 @@ public interface IPopulation extends IConfigured {
      * 
      * @return fittest chromosome of this population
      */
-    public IChromosome getFittest();
+    public IChromosome fittest();
 
     /**
      * Get statistic information of this population.
@@ -77,7 +78,7 @@ public interface IPopulation extends IConfigured {
      * 
      * @return stats of this population
      */
-    public PopulationStats getStats();
+    public PopulationStats stats();
 
 
     /**
@@ -88,11 +89,16 @@ public interface IPopulation extends IConfigured {
      * 
      * @author <i>Dmytro Buryak &ltdmytro.buryak@gmail.com&gt</i>
      * @version 0.1
+     * @param <C>
+     *            concrete chromosome implementation type that is used by this builder
      * @param <P>
      *            type of {@link IPopulation} implementation this builder is dedicated to
      */
     @NotThreadSafe
-    public interface IPopulationBuilder<P extends IPopulation> extends InstanceBuilder<IPopulation>, IConfigurable {
+    public static interface IPopulationBuilder<C extends IChromosome, P extends IPopulation<C>>
+        extends
+            InstanceBuilder<P>,
+            IConfigurable {
 
         /**
          * Copy given population into target population. Doesn't copy derivative attributes, they are calculated when
@@ -106,7 +112,20 @@ public interface IPopulation extends IConfigured {
          *            source population to copy chromosomes from
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> from(final P population);
+        public IPopulationBuilder<C, P> from(final P population);
+
+        /**
+         * Supply this builder with stream of chromosomes.
+         * <br/><b>PRE-conditions:</b> non-null chromosomes
+         * <br/><b>POST-conditions:</b> non-null result
+         * <br/><b>Side-effects:</b> UNKNOWN
+         * <br/><b>Created on:</b> <i>7:59:35 PM Sep 5, 2016</i>
+         * 
+         * @param chromosomes
+         *            observable that emits chromosomes to be added to the target population
+         * @return this builder (for call chaining)
+         */
+        public IPopulationBuilder<C, P> chromosomes(final Observable<C> chromosomes);
 
         /**
          * Add chromosome to target population.
@@ -119,7 +138,7 @@ public interface IPopulation extends IConfigured {
          *            chromosome to be added to the target population
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> addChromosome(final IChromosome chromosome);
+        public IPopulationBuilder<C, P> addChromosome(final C chromosome);
 
         /**
          * Remove chromosome from target population.
@@ -132,7 +151,7 @@ public interface IPopulation extends IConfigured {
          *            chromosome to be removed from target population
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> removeChromosome(final IChromosome chromosome);
+        public IPopulationBuilder<C, P> removeChromosome(final C chromosome);
 
         /**
          * Configure this builder to remove duplicates when building target population. This method only configures this
@@ -147,7 +166,7 @@ public interface IPopulation extends IConfigured {
          *            indicates if duplicate chromosomes should be removed from target population
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> removeDuplicates(final boolean removeDuplicates);
+        public IPopulationBuilder<C, P> removeDuplicates(final boolean removeDuplicates);
 
         /**
          * Set appearance function that is responsible for generating new individuals when population is less than its
@@ -161,7 +180,7 @@ public interface IPopulation extends IConfigured {
          *            function for generating new individuals
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> appearanceFunc(final IAppearanceStrategy appearanceFunc);
+        public IPopulationBuilder<C, P> appearanceFunc(final Observable<C> appearanceFunc);
 
         /**
          * Set selection function that is responsible for cutting down population when number of chromosomes exceeds
@@ -175,7 +194,7 @@ public interface IPopulation extends IConfigured {
          *            function for selection operation
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> selectionFunc(final ISelectionStrategy selectionFunc);
+        public IPopulationBuilder<C, P> selectionFunc(final ISelectionPredicate<C> selectionFunc);
 
         /**
          * Set size of target population.
@@ -188,7 +207,7 @@ public interface IPopulation extends IConfigured {
          *            size of target population
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> size(final int size);
+        public IPopulationBuilder<C, P> size(final int size);
 
         /**
          * Set number of elite individuals that should be preserved in target population. Elite chromosomes are not
@@ -205,7 +224,7 @@ public interface IPopulation extends IConfigured {
          *            number of elite chromosomes to be preserved
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<P> eliteCount(final int eliteCount);
+        public IPopulationBuilder<C, P> eliteCount(final int eliteCount);
 
     }
 
