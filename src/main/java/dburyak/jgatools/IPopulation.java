@@ -67,7 +67,7 @@ public interface IPopulation<C extends IChromosome> extends IConfigured {
      * 
      * @return fittest chromosome of this population
      */
-    public IChromosome fittest();
+    public C fittest();
 
     /**
      * Get statistic information of this population.
@@ -141,17 +141,17 @@ public interface IPopulation<C extends IChromosome> extends IConfigured {
         public IPopulationBuilder<C, P> addChromosome(final C chromosome);
 
         /**
-         * Remove chromosome from target population.
+         * Deny chromosome in target population.
          * <br/><b>PRE-conditions:</b> non-null chromosome
          * <br/><b>POST-conditions:</b> non-null result
          * <br/><b>Side-effects:</b> UNKNOWN
          * <br/><b>Created on:</b> <i>7:32:29 PM Sep 3, 2016</i>
          * 
          * @param chromosome
-         *            chromosome to be removed from target population
+         *            chromosome to be denied in target population
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<C, P> removeChromosome(final C chromosome);
+        public IPopulationBuilder<C, P> denyChromosome(final C chromosome);
 
         /**
          * Configure this builder to remove duplicates when building target population. This method only configures this
@@ -169,32 +169,17 @@ public interface IPopulation<C extends IChromosome> extends IConfigured {
         public IPopulationBuilder<C, P> removeDuplicates(final boolean removeDuplicates);
 
         /**
-         * Set appearance function that is responsible for generating new individuals when population is less than its
-         * size.
-         * <br/><b>PRE-conditions:</b> non-null appearanceFunc
+         * Set appearance source that emits new "out of nowhere" individuals when population is less than its size.
+         * <br/><b>PRE-conditions:</b> non-null appearanceSource
          * <br/><b>POST-conditions:</b> non-null result
          * <br/><b>Side-effects:</b> UNKNOWN
          * <br/><b>Created on:</b> <i>7:44:47 PM Sep 3, 2016</i>
          * 
-         * @param appearanceFunc
-         *            function for generating new individuals
+         * @param appearSource
+         *            observable for generating new individuals
          * @return this builder (for call chaining)
          */
-        public IPopulationBuilder<C, P> appearanceFunc(final Observable<C> appearanceFunc);
-
-        /**
-         * Set selection function that is responsible for cutting down population when number of chromosomes exceeds
-         * population size.
-         * <br/><b>PRE-conditions:</b> non-null selectionFunc
-         * <br/><b>POST-conditions:</b> non-null result
-         * <br/><b>Side-effects:</b> UNKNOWN
-         * <br/><b>Created on:</b> <i>11:30:17 PM Sep 3, 2016</i>
-         * 
-         * @param selectionFunc
-         *            function for selection operation
-         * @return this builder (for call chaining)
-         */
-        public IPopulationBuilder<C, P> selectionFunc(final ISelectionPredicate<C> selectionFunc);
+        public IPopulationBuilder<C, P> appearSource(final Observable<C> appearSource);
 
         /**
          * Set size of target population.

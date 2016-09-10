@@ -311,7 +311,7 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
                 .concatWith(appearSource)
                 .take(bufferSize);
 
-        final Observable<C> nextGeneration = selectFunc.select(buffer); // selection
+        final Observable<C> nextGeneration = selectFunc.select(buffer, population.size()); // selection
 
         final IPopulationBuilder<C, P> nextPopulationBuilder = populationBuilderProducer.get() // new population builder
             .chromosomes(nextGeneration); // set chromosomes for next population
@@ -590,6 +590,7 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
             if (bufferSize <= 0) {
                 return false;
             }
+            // TODO : add compound (invariant) logical checks
             return true;
         }
 
