@@ -36,7 +36,7 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
     private final Properties props;
 
     /**
-     * Sorted list of all chromosomes in this population. The fittest ones come first.
+     * All chromosomes in this population in sorted order. The fittest ones come first.
      * <br/><b>Created on:</b> <i>12:30:31 AM Sep 7, 2016</i>
      */
     private final List<C> chromosomes;
@@ -58,22 +58,15 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
      * @param props
      *            properties for this population
      * @param chromosomes
-     *            source of all chromosomes for this population
-     * @param size
-     *            size of the population
+     *            all chromosomes for this population (sorted)
      * @param eliteCount
      *            number of elite chromosomes in this population
      */
-    private Population(final Properties props, final Observable<C> chromosomes, final int size, final int eliteCount) {
+    private Population(final Properties props, final List<C> chromosomes, final int eliteCount) {
         this.props = props;
-        // it's OK to use Blocking here, since this constructor is a subscriber and needs to receive all the elements
-        // this is the place where chromosomes sorting happens
-        this.chromosomes = Collections.unmodifiableList(chromosomes.toSortedList().toBlocking().single());
-        // we're checking size here (not in the builder how it would be better) because only at this point we know
-        // actual count of the chromosomes received; builder knows nothing about the actual size, since it doesn't
-        // subscribe to chromosomes observable. However, this should be always OK, since we use "take" operator
-        Validators.isTrue(size == this.chromosomes.size());
+        this.chromosomes = Collections.unmodifiableList(chromosomes);
         this.eliteCount = eliteCount;
+        // TODO : add stats calculation
     }
 
     /**
@@ -257,10 +250,6 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
             if (!isValid()) {
                 throw new IllegalStateException();
             }
-            // return new Population<>(props, chromosomes, size, eliteCount);
-            // FIXME
-            // chromosomes pipeline should be configured here instead of in Population constructor
-            // FIXME : add concatWith(appearanceSource) and take(size) operators
             @SuppressWarnings("boxing") Observable<C> allChromosomes = Observable.from(added)
                 .concatWith(chromosomes)
                 .concatWith(appearSource)
@@ -268,8 +257,11 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
             if (removeDuplicates) {
                 allChromosomes = allChromosomes.distinct();
             }
-            allChromosomes = allChromosomes.take(size).sorted();
-            return new Population<>(props, chromosomes, size, eliteCount);
+            allChromosomes = allChromosomes.take(size);
+            // subscription happens here, target population is the subscriber for all chromosomes (evaluate stats)
+            final List<C> chromosomesList = allChromosomes.toSortedList().toBlocking().single();
+            Validators.isTrue(chromosomesList.size() == size);
+            return new Population<>(props, chromosomesList, eliteCount);
         }
 
         /**

@@ -17,7 +17,7 @@ import rx.Observable;
 public interface ISelectionStrategy<C extends IChromosome> {
 
     /**
-     * Perfrom natural selection operation on given "buffer" of chromosomes. Usually, this buffer is a collection of
+     * Perform natural selection operation on given "buffer" of chromosomes. Usually, this buffer is a collection of
      * mutants, offsprings, previous population and new generated "out of nowhere" chromosomes.
      * <br/><b>PRE-conditions:</b> non-null buffer
      * <br/><b>POST-conditions:</b> non-null result
@@ -26,10 +26,8 @@ public interface ISelectionStrategy<C extends IChromosome> {
      * 
      * @param buffer
      *            chromosomes to apply natural selection operation to
-     * @param size
-     *            number of chromosomes that should be left alive after selection
      * @return result of natural selection
      */
-    public Observable<C> select(final Observable<C> buffer, final int size);
+    public Observable<C> select(final Observable<C> buffer);
 
 }
