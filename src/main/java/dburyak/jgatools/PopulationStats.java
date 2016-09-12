@@ -1,6 +1,9 @@
 package dburyak.jgatools;
 
 
+import java.util.stream.IntStream;
+import java.util.stream.Stream;
+
 import javax.annotation.concurrent.Immutable;
 import javax.annotation.concurrent.NotThreadSafe;
 
@@ -385,6 +388,45 @@ public final class PopulationStats {
          */
         private Fitness avgFitness = null;
 
+
+        /**
+         * Evaluate all population stats from given chromosomes. Only eliteCount is not evaluated by this method.
+         * <br><b>PRE-conditions:</b> non-null chromosomes
+         * <br><b>POST-conditions:</b> non-null result
+         * <br><b>Side-effects:</b> this builder state is changed
+         * <br><b>Created on:</b> <i>4:42:23 AM Sep 12, 2016</i>
+         * 
+         * @param <C>
+         *            concrete chromosome implementation type
+         * @param chromosomes
+         *            chromosomes of population
+         * @return this builder (for call chaining)
+         */
+        @SuppressWarnings("resource")
+        public final <C extends IChromosome> PopulationStatsBuilder eval(final Stream<C> chromosomes) {
+            final Stream<C> parallel = chromosomes.parallel();
+
+            final long sizeL = parallel.count();
+            Validators.isTrue(Long.compare(sizeL, Integer.MAX_VALUE) <= 0); // sizeL <= MAX_INT
+            size((int) sizeL);
+
+            final IntStream ages = parallel.mapToInt(IChromosome::age);
+            minAge(ages.min().orElse(0));
+            maxAge(ages.max().orElse(0));
+            avgAge(ages.average().orElse(0.0D));
+
+            final IntStream generations = parallel.mapToInt(IChromosome::generation);
+            minGeneration(generations.min().orElse(0));
+            maxGeneration(generations.max().orElse(0));
+            avgGeneration(generations.average().orElse(0.0D));
+
+            final Stream<Fitness> fits = parallel.map(IChromosome::fitness);
+            minFitness(fits.min(Fitness::compareTo).orElse(Fitness.min()));
+            maxFitness(fits.max(Fitness::compareTo).orElse(Fitness.min()));
+            avgFitness(new Fitness(fits.mapToDouble(Fitness::value).average().orElse(Fitness.minValue())));
+
+            return this;
+        }
 
         /**
          * Set size for target population stats.

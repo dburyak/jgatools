@@ -45,7 +45,7 @@ import rx.subjects.PublishSubject;
  *            concrete population implementation type
  */
 @ThreadSafe
-final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implements IGeneticAlgorithm<C, P> {
+public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implements IGeneticAlgorithm<C, P> {
 
     /**
      * System logger.
@@ -415,9 +415,16 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
      * @param <P>
      *            concrete population implementation type for target GA
      */
-    static final class ReactiveGABuilder<C extends IChromosome, P extends IPopulation<C>>
+    public static final class ReactiveGABuilder<C extends IChromosome, P extends IPopulation<C>>
         implements
             IGeneticAlgorithmBuilder<C, P> {
+
+        /**
+         * Default timeout for detecting situations when there's not enough chromosomes in population for choosing
+         * mates.
+         * <br><b>Created on:</b> <i>4:50:26 AM Sep 12, 2016</i>
+         */
+        private static final Duration MATES_EXHAUST_TIMEOUT_DEFAULT = Duration.ofSeconds(2);
 
         /**
          * Name for target GA.
@@ -487,10 +494,9 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
 
         /**
          * Mates selection timeout for detection conflicting configuration.
-         * TODO : make this configurable
          * <br/><b>Created on:</b> <i>5:21:16 AM Sep 6, 2016</i>
          */
-        private Duration matesSelectTimeout = Duration.ofSeconds(2);
+        private Duration matesSelectTimeout = MATES_EXHAUST_TIMEOUT_DEFAULT;
 
         /**
          * Size of the "buffer" intermediate chromosomes container.
@@ -506,7 +512,7 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
          * <br/><b>Side-effects:</b> NONE
          * <br/><b>Created on:</b> <i>4:57:27 AM Sep 6, 2016</i>
          */
-        ReactiveGABuilder() {
+        public ReactiveGABuilder() {
             props = new Properties();
         }
 
@@ -590,7 +596,6 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
             if (bufferSize <= 0) {
                 return false;
             }
-            // TODO : add compound (invariant) logical checks
             return true;
         }
 
@@ -873,6 +878,24 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
         }
 
         /**
+         * Set timeout for detecting situations when there's not enough chromosomes in population for choosing mates.
+         * <br><b>PRE-conditions:</b> positive timeout
+         * <br><b>POST-conditions:</b> non-null result
+         * <br><b>Side-effects:</b> this builder state is changed
+         * <br><b>Created on:</b> <i>4:52:23 AM Sep 12, 2016</i>
+         * 
+         * @param timeout
+         *            timeout for choosing mates
+         * @return this builder (for call chaining)
+         */
+        public final IGeneticAlgorithmBuilder<C, P> matesSelectTimeout(final Duration timeout) {
+            Validators.nonNull(timeout);
+            Validators.positive(timeout);
+            matesSelectTimeout = timeout;
+            return this;
+        }
+
+        /**
          * Set size of "buffer" intermediate chromosomes container.
          * <br/><b>PRE-conditions:</b> bufferSize &gt 0
          * <br/><b>POST-conditions:</b> non-null result
@@ -889,7 +912,7 @@ final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> implemen
         public final IGeneticAlgorithmBuilder<C, P> bufferSize(final int bufferSize) {
             Validators.positive(bufferSize);
             this.bufferSize = bufferSize;
-            return null;
+            return this;
         }
 
     }

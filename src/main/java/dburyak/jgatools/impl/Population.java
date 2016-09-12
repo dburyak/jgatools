@@ -12,6 +12,7 @@ import javax.annotation.concurrent.NotThreadSafe;
 import dburyak.jgatools.IChromosome;
 import dburyak.jgatools.IPopulation;
 import dburyak.jgatools.PopulationStats;
+import dburyak.jgatools.PopulationStats.PopulationStatsBuilder;
 import dburyak.jtools.Validators;
 import rx.Observable;
 
@@ -47,6 +48,12 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
      */
     private final int eliteCount;
 
+    /**
+     * Stats of this population.
+     * <br><b>Created on:</b> <i>3:39:19 AM Sep 12, 2016</i>
+     */
+    private final PopulationStats stats;
+
 
     /**
      * Constructor for class : [jgatools] dburyak.jgatools.impl.Population.<br/>
@@ -66,7 +73,23 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
         this.props = props;
         this.chromosomes = Collections.unmodifiableList(chromosomes);
         this.eliteCount = eliteCount;
-        // TODO : add stats calculation
+        stats = evalStats();
+    }
+
+    /**
+     * Evaluate population stats of this population.
+     * <br><b>PRE-conditions:</b> this object is initialized
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> NONE
+     * <br><b>Created on:</b> <i>4:45:52 AM Sep 12, 2016</i>
+     * 
+     * @return stats of this population
+     */
+    private final PopulationStats evalStats() {
+        final PopulationStatsBuilder b = new PopulationStatsBuilder();
+        b.eval(chromosomes.stream());
+        b.eliteCount(eliteCount);
+        return b.build();
     }
 
     /**
@@ -160,8 +183,7 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
      */
     @Override
     public final PopulationStats stats() {
-        // TODO [12:19:18 AM Sep 7, 2016] Implement method.
-        return null;
+        return stats;
     }
 
 
