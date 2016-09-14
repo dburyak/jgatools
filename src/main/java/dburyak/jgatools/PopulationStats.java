@@ -1,7 +1,9 @@
 package dburyak.jgatools;
 
 
-import java.util.stream.IntStream;
+import java.util.IntSummaryStatistics;
+import java.util.List;
+import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
 import javax.annotation.concurrent.Immutable;
@@ -402,28 +404,31 @@ public final class PopulationStats {
          *            chromosomes of population
          * @return this builder (for call chaining)
          */
-        @SuppressWarnings("resource")
         public final <C extends IChromosome> PopulationStatsBuilder eval(final Stream<C> chromosomes) {
-            final Stream<C> parallel = chromosomes.parallel();
+            final List<C> chrList = chromosomes.parallel().collect(Collectors.toList());
 
-            final long sizeL = parallel.count();
+            final long sizeL = chrList.parallelStream().count();
             Validators.isTrue(Long.compare(sizeL, Integer.MAX_VALUE) <= 0); // sizeL <= MAX_INT
             size((int) sizeL);
 
-            final IntStream ages = parallel.mapToInt(IChromosome::age);
-            minAge(ages.min().orElse(0));
-            maxAge(ages.max().orElse(0));
-            avgAge(ages.average().orElse(0.0D));
+            final IntSummaryStatistics ages = chrList.parallelStream().collect(Collectors.summarizingInt(
+                IChromosome::age));
+            minAge(ages.getMin());
+            maxAge(ages.getMax());
+            avgAge(ages.getAverage());
 
-            final IntStream generations = parallel.mapToInt(IChromosome::generation);
-            minGeneration(generations.min().orElse(0));
-            maxGeneration(generations.max().orElse(0));
-            avgGeneration(generations.average().orElse(0.0D));
+            final IntSummaryStatistics gens = chrList.parallelStream()
+                .collect(Collectors.summarizingInt(IChromosome::generation));
+            minGeneration(gens.getMin());
+            maxGeneration(gens.getMax());
+            avgGeneration(gens.getAverage());
 
-            final Stream<Fitness> fits = parallel.map(IChromosome::fitness);
-            minFitness(fits.min(Fitness::compareTo).orElse(Fitness.min()));
-            maxFitness(fits.max(Fitness::compareTo).orElse(Fitness.min()));
-            avgFitness(new Fitness(fits.mapToDouble(Fitness::value).average().orElse(Fitness.minValue())));
+            minFitness(chrList.parallelStream().map(IChromosome::fitness)
+                .min(Fitness::compareTo).orElse(Fitness.min()));
+            maxFitness(chrList.parallelStream().map(IChromosome::fitness)
+                .max(Fitness::compareTo).orElse(Fitness.min()));
+            avgFitness(new Fitness(chrList.parallelStream().map(IChromosome::fitness).mapToDouble(Fitness::value)
+                .average().orElse(Fitness.minValue())));
 
             return this;
         }

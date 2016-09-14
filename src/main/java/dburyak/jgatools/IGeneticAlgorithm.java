@@ -5,6 +5,7 @@ import java.util.function.Supplier;
 
 import javax.annotation.concurrent.NotThreadSafe;
 
+import dburyak.jgatools.IChromosome.IChromosomeBuilder;
 import dburyak.jgatools.IPopulation.IPopulationBuilder;
 import dburyak.jtools.IConfigurable;
 import dburyak.jtools.IConfigured;
@@ -12,6 +13,7 @@ import dburyak.jtools.INameable;
 import dburyak.jtools.INamed;
 import dburyak.jtools.InstanceBuilder;
 import rx.Observable;
+import rx.Single;
 
 
 /**
@@ -48,6 +50,30 @@ public interface IGeneticAlgorithm<C extends IChromosome, P extends IPopulation<
      * <br/><b>Created on:</b> <i>2:50:40 AM Sep 11, 2016</i>
      */
     public void stop();
+
+    /**
+     * Get observable that emits population stats on each GA iteration. Should return a hot observable that is inactive
+     * when algorithm is stopped, and spits stats when algorithm is running. Thus, it's advisable to subscribe to this
+     * observable prior to starting the GA to not miss first portion of stats.
+     * <br><b>PRE-conditions:</b> NONE
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> UNKNOWN
+     * <br><b>Created on:</b> <i>5:20:59 AM Sep 12, 2016</i>
+     * 
+     * @return observable that emits population stats on each GA iteration
+     */
+    public Observable<PopulationStats> stats();
+
+    /**
+     * Get computation result of this GA.
+     * <br><b>PRE-conditions:</b> NONE
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> UNKNOWN
+     * <br><b>Created on:</b> <i>5:25:43 AM Sep 12, 2016</i>
+     * 
+     * @return single that emits result of this GA
+     */
+    public Single<C> result();
 
 
     /**
@@ -210,6 +236,21 @@ public interface IGeneticAlgorithm<C extends IChromosome, P extends IPopulation<
          * @return this builder (for call chaining)
          */
         public IGeneticAlgorithmBuilder<C, P> bufferSize(final int bufferSize);
+
+        /**
+         * Set supplier that produces chromosome builders for building chromosomes. Standard usage - for incrementing
+         * age on non-modified chromosomes on each evolution iteration.
+         * <br><b>PRE-conditions:</b> non-null chromosomeBuilder
+         * <br><b>POST-conditions:</b> non-null result
+         * <br><b>Side-effects:</b> UNKNOWN
+         * <br><b>Created on:</b> <i>6:54:03 AM Sep 14, 2016</i>
+         * 
+         * @param chromosomeBuilder
+         *            producer of chromosome builders
+         * @return this builder (for call chaining)
+         */
+        public IGeneticAlgorithmBuilder<C, P> chromosomeBuilder(
+            final Supplier<IChromosomeBuilder<C, ? extends Cloneable>> chromosomeBuilder);
 
     }
 

@@ -16,6 +16,7 @@ import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 
 import dburyak.jgatools.IChromosome;
+import dburyak.jgatools.IChromosome.IChromosomeBuilder;
 import dburyak.jgatools.ICrossoverStrategy;
 import dburyak.jgatools.IGeneticAlgorithm;
 import dburyak.jgatools.IMatesSelector;
@@ -25,10 +26,13 @@ import dburyak.jgatools.IPopulation.IPopulationBuilder;
 import dburyak.jgatools.ISelectionPredicate;
 import dburyak.jgatools.ISelectionStrategy;
 import dburyak.jgatools.ITerminationCondition;
+import dburyak.jgatools.PopulationStats;
 import dburyak.jtools.Validators;
 import dburyak.jtools.tuples.Tuples;
 import rx.Observable;
+import rx.Single;
 import rx.Subscription;
+import rx.schedulers.Schedulers;
 import rx.subjects.PublishSubject;
 
 
@@ -137,6 +141,13 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
     private final Supplier<IPopulationBuilder<C, P>> populationBuilderProducer;
 
     /**
+     * Supplier function that produces new builders of {@link IChromosome} instances. It is used on each evolution
+     * iteration step to increment age of non-modified chromosomes.
+     * <br><b>Created on:</b> <i>7:13:16 AM Sep 14, 2016</i>
+     */
+    private final Supplier<IChromosomeBuilder<C, ? extends Cloneable>> chromosomeBuilder;
+
+    /**
      * Subscription of evolution loop. Is created on each start of GA. If is unsubscribed, then GA terminates.
      * <br/><b>Created on:</b> <i>4:14:13 AM Sep 6, 2016</i>
      */
@@ -145,11 +156,33 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
 
     /**
      * Auxiliary object to create recursive loop in RX pipeline, where population received at the end of pipeline is
-     * examined and pushed into the beginning of pipeline.
+     * examined and pushed into the beginning of pipeline. The goal could be achieved by using recursive RX pipeline
+     * building, but in this case the size of the pipeline would be enormous. So such at first glance "not so elegant"
+     * solution is really intended here.
      * <br/><b>Created on:</b> <i>4:15:17 AM Sep 6, 2016</i>
      */
     @GuardedBy("this")
     private PublishSubject<P> populations = null;
+
+    /**
+     * Result of this GA evaluations.
+     * <br><b>Created on:</b> <i>5:42:30 AM Sep 12, 2016</i>
+     */
+    @GuardedBy("this")
+    private PublishSubject<C> resultSubj = null;
+
+    /**
+     * Single that holds result of evolution computation. Is cached.
+     * <br><b>Created on:</b> <i>12:24:09 AM Sep 13, 2016</i>
+     */
+    @GuardedBy("this")
+    private Single<C> result = null;
+
+    /**
+     * Subject for emitting population stats on each GA iteration to subscribers.
+     * <br><b>Created on:</b> <i>5:35:23 AM Sep 12, 2016</i>
+     */
+    private final PublishSubject<PopulationStats> stats = PublishSubject.create();
 
 
     /**
@@ -185,6 +218,8 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
      *            size of "buffer" intermediate zone
      * @param populationBuilderProducer
      *            supplier of population builder instances
+     * @param chromosomeBuilder
+     *            supplier of chromosome builder instances
      */
     private ReactiveGA(
         final String name,
@@ -199,7 +234,8 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
         final Duration matesSelectTimeout,
         final ISelectionStrategy<C> selectFunc,
         final int bufferSize,
-        final Supplier<IPopulationBuilder<C, P>> populationBuilderProducer) {
+        final Supplier<IPopulationBuilder<C, P>> populationBuilderProducer,
+        final Supplier<IChromosomeBuilder<C, ? extends Cloneable>> chromosomeBuilder) {
 
         this.name = name;
         this.props = props;
@@ -218,6 +254,7 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
 
         this.populationBuilderProducer = populationBuilderProducer;
         this.selectFunc = selectFunc;
+        this.chromosomeBuilder = chromosomeBuilder;
 
         evolutionPipelineSubscr = null;
         populations = null;
@@ -283,20 +320,25 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
      *            current population
      * @return observable that emits next generation population
      */
+    @SuppressWarnings("nls")
     private final Observable<P> buildIterationPipeline(final IPopulation<C> population) {
+        LOG.debug("building iteration pipeline with origin : population = [%s]", population);
         final Observable<C> origin = population.chromosomes();
         final int eliteCount = population.eliteCount();
 
         final Observable<C> modified = Observable.merge(
             // MUTATION
-            origin
-                .filter(mutationSelector::select) // choose mutants
+            origin.filter(mutationSelector::select) // choose mutants
+                .doOnNext(c -> LOG.debug("chosen for mutation : c = [%s]", c))
                 .map(mutationFunc::mutate), // mutate
+
 
             // CROSSOVER
             origin.filter(parent1Selector::select) // choose parent1
+                .doOnNext(c -> LOG.debug("chosen for crossover : c = [%s]", c))
                 .map(p1 -> {
-                    return matesSelector.select(p1, origin.repeat()) // choose mates
+                    // maybe use origin.repeat() ?
+                    return matesSelector.select(p1, origin) // choose mates
                         .startWith(p1); // don't forget about parent1
                 })
                 // detect infinite mates selection, @see IMatesSelector#select(C, Observable<C>)
@@ -306,8 +348,11 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
 
         final Observable<C> buffer =
             origin.take(eliteCount) // original elite
+                .map(this::incrementAge) // increment age of original elite
+                .doOnError(e -> LOG.error("got error when incrementing"))
                 .concatWith(modified)
-                .concatWith(origin.skip(eliteCount)) // original non-elite
+                .concatWith(origin.skip(eliteCount) // original non-elite
+                    .map(this::incrementAge)) // increment age of origin non-elite
                 .concatWith(appearSource)
                 .take(bufferSize);
 
@@ -316,6 +361,26 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
         final IPopulationBuilder<C, P> nextPopulationBuilder = populationBuilderProducer.get() // new population builder
             .chromosomes(nextGeneration); // set chromosomes for next population
         return Observable.fromCallable(nextPopulationBuilder::build);
+    }
+
+    /**
+     * Increment age of provided chromosome. Note that chromosome is cloned using configured chromosome builder
+     * {@link #chromosomeBuilder}.
+     * <br><b>PRE-conditions:</b> non-null original
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> NONE
+     * <br><b>Created on:</b> <i>7:35:00 AM Sep 14, 2016</i>
+     * 
+     * @param original
+     *            original chromosome to increment age
+     * @return new chromosome with incremented age
+     */
+    private final C incrementAge(final C original) {
+        Validators.nonNull(original);
+        return chromosomeBuilder.get()
+            .from(original)
+            .age(original.age() + 1)
+            .build();
     }
 
     /**
@@ -332,28 +397,36 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
         final Observable<Integer> iterations = Observable.from(() -> IntStream.iterate(0, i -> i + 1).iterator());
         final Instant startTime = Instant.now();
         final Observable<Duration> durations = Observable.from(() -> {
-            return Stream.generate(() -> 0).map(tick -> Duration.between(startTime, Instant.now())).iterator();
+            return Stream.generate(() -> IntStream.iterate(0, i -> i + 1).iterator())
+                .map(tick -> Duration.between(startTime, Instant.now())).iterator();
         });
         return Observable.zip(
             initialPopulation().concatWith(
                 populations.doOnCompleted(() -> LOG.debug("populations completed"))),
             iterations,
             durations,
-            (p, i, d) -> {
-                return Tuples.create(p, i, d);
-            })
+            (p, i, d) -> Tuples.create(p, i, d))
+            .observeOn(Schedulers.computation())
+            .subscribeOn(Schedulers.computation())
             .subscribe(
                 t3 -> { // tuple (population, iteration, duration)
                     LOG.debug("evolution iteration : iteration = [%d] ; duration = [%s] ; population = [%s]",
                         t3._2, t3._3, t3._1);
                     if (termCondition.shouldTerminate(t3._1, t3._2, t3._3)) {
+                        LOG.debug("termination condition met");
+                        // send result
+                        resultSubj.onNext(t3._1.fittest());
                         populations.onCompleted();
                     } else {
-                        buildIterationPipeline(t3._1).subscribe(p -> populations.onNext(p));
+                        stats.onNext(t3._1.stats());
+                        buildIterationPipeline(t3._1)
+                            .observeOn(Schedulers.computation())
+                            .subscribeOn(Schedulers.computation())
+                            .subscribe(p -> populations.onNext(p));
                     }
                 },
                 error -> {
-                    LOG.error("error in evolution pipeline : error = [%s]", error);
+                    LOG.error("error in evolution pipeline", error);
                 },
                 () -> {
                     LOG.info("evolution pipeline completed");
@@ -377,7 +450,10 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
             return;
         }
         populations = PublishSubject.create();
+        resultSubj = PublishSubject.create();
+        result = resultSubj.take(1).cache().toSingle();
         evolutionPipelineSubscr = startEvolution();
+        LOG.info("GA started");
     }
 
     /**
@@ -399,7 +475,46 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
         evolutionPipelineSubscr.unsubscribe();
         evolutionPipelineSubscr = null;
         populations.onCompleted();
+        resultSubj.onCompleted();
         populations = null;
+        resultSubj = null;
+        result = null;
+        LOG.info("GA stopped");
+    }
+
+
+    /**
+     * Get source of population stats on each GA iteration.
+     * <br><b>PRE-conditions:</b> NONE
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> NONE
+     * <br><b>Created on:</b> <i>5:37:38 AM Sep 12, 2016</i>
+     * 
+     * @see dburyak.jgatools.IGeneticAlgorithm#stats()
+     * @return observable that emits stats of population on each GA iteration
+     */
+    @Override
+    public final Observable<PopulationStats> stats() {
+        return stats.asObservable();
+    }
+
+    /**
+     * Get result of this GA evaluations.
+     * <br><b>PRE-conditions:</b> GA is running
+     * <br><b>POST-conditions:</b> non-null result
+     * <br><b>Side-effects:</b> NONE
+     * <br><b>Created on:</b> <i>5:38:44 AM Sep 12, 2016</i>
+     * 
+     * @see dburyak.jgatools.IGeneticAlgorithm#result()
+     * @return future that holds this GA computation result
+     */
+    @SuppressWarnings("nls")
+    @Override
+    public final synchronized Single<C> result() throws IllegalStateException {
+        if (evolutionPipelineSubscr == null) { // not running
+            throw new IllegalStateException("GA is not running");
+        }
+        return result;
     }
 
 
@@ -424,13 +539,13 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
          * mates.
          * <br><b>Created on:</b> <i>4:50:26 AM Sep 12, 2016</i>
          */
-        private static final Duration MATES_EXHAUST_TIMEOUT_DEFAULT = Duration.ofSeconds(2);
+        private static final Duration MATES_EXHAUST_TIMEOUT_DEFAULT = Duration.ofSeconds(5);
 
         /**
          * Name for target GA.
          * <br/><b>Created on:</b> <i>4:55:04 AM Sep 6, 2016</i>
          */
-        private String name = null;
+        private String name = ""; //$NON-NLS-1$
 
         /**
          * Properties for target GA.
@@ -504,6 +619,12 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
          */
         private int bufferSize = -1;
 
+        /**
+         * Chromosome builder producer for cloning chromosomes.
+         * <br><b>Created on:</b> <i>6:59:33 AM Sep 14, 2016</i>
+         */
+        private Supplier<IChromosomeBuilder<C, ? extends Cloneable>> chromosomeBuilder = null;
+
 
         /**
          * Constructor for class : [jgatools] dburyak.jgatools.impl.ReactiveGABuilder.<br/>
@@ -545,7 +666,8 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
                 matesSelectTimeout,
                 selectionFunc,
                 bufferSize,
-                populationBuilder);
+                populationBuilder,
+                chromosomeBuilder);
         }
 
         /**
@@ -594,6 +716,9 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
                 return false;
             }
             if (bufferSize <= 0) {
+                return false;
+            }
+            if (chromosomeBuilder == null) {
                 return false;
             }
             return true;
@@ -899,7 +1024,7 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
          * Set size of "buffer" intermediate chromosomes container.
          * <br/><b>PRE-conditions:</b> bufferSize &gt 0
          * <br/><b>POST-conditions:</b> non-null result
-         * <br/><b>Side-effects:</b> state is changed
+         * <br/><b>Side-effects:</b> this builder state is changed
          * <br/><b>Created on:</b> <i>5:49:14 AM Sep 6, 2016</i>
          * 
          * @see dburyak.jgatools.IGeneticAlgorithm.IGeneticAlgorithmBuilder#bufferSize(int)
@@ -912,6 +1037,28 @@ public final class ReactiveGA<C extends IChromosome, P extends IPopulation<C>> i
         public final IGeneticAlgorithmBuilder<C, P> bufferSize(final int bufferSize) {
             Validators.positive(bufferSize);
             this.bufferSize = bufferSize;
+            return this;
+        }
+
+        /**
+         * Set chromosome builder producer for chromosomes cloning and increasing age on each evolution iteration.
+         * <br><b>PRE-conditions:</b> non-null chromosomeBuilder
+         * <br><b>POST-conditions:</b> non-null result
+         * <br><b>Side-effects:</b> this builder state is changed
+         * <br><b>Created on:</b> <i>6:56:38 AM Sep 14, 2016</i>
+         * 
+         * @see dburyak.jgatools.IGeneticAlgorithm.IGeneticAlgorithmBuilder#chromosomeBuilder(java.util.function.Supplier)
+         * @param chromosomeBuilder
+         *            chromosome builder producer
+         * @return this builder (for call chaining)
+         */
+        @SuppressWarnings("hiding")
+        @Override
+        public IGeneticAlgorithmBuilder<C, P> chromosomeBuilder(
+            Supplier<IChromosomeBuilder<C, ? extends Cloneable>> chromosomeBuilder) {
+
+            Validators.nonNull(chromosomeBuilder);
+            this.chromosomeBuilder = chromosomeBuilder;
             return this;
         }
 

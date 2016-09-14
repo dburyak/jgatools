@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Configuration status="WARN">
+	<Appenders>
+		<Console name="Console" target="SYSTEM_OUT">
+			<PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%-15.15t] %-20.20logger.%-20.20M - %msg%n" />
+		</Console>
+		<RandomAccessFile name="SystemFile" fileName="test.system.log" append="false">
+			<PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%-15.15t] %-20.20logger.%-20.20M - %msg%n" />
+		</RandomAccessFile>
+		<RandomAccessFile name="ReportFile" fileName="test.report.log" append="false">
+			<PatternLayout pattern="%d{HH:mm:ss.SSS} %-5level [%-15.15t] %-20.20logger.%-20.20M - %msg%n" />
+		</RandomAccessFile>
+	</Appenders>
+
+	<Loggers>
+		<Root level="trace">
+			<AppenderRef ref="Console" />
+			<AppenderRef ref="SystemFile" />
+		</Root>
+		<Logger name="REPORT" level="info" additivity="false">
+			<AppenderRef ref="ReportFile" />
+		</Logger>
+	</Loggers>
+</Configuration>

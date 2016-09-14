@@ -192,7 +192,7 @@ public final class BitSetChromosome implements IChromosome {
      * 
      * @return clone of underlying bitset data
      */
-    public final BitSet getBitset() {
+    public final BitSet bitset() {
         return (BitSet) bitset.clone();
     }
 
@@ -235,7 +235,7 @@ public final class BitSetChromosome implements IChromosome {
          * Fitness evaluation function for calculating fitness of target chromosome.
          * <br><b>Created on:</b> <i>2:15:42 AM Sep 12, 2016</i>
          */
-        private IFitnessFunction<BitSetChromosome> fitnessFunc = null;
+        private IFitnessFunction<BitSet> fitnessFunc = null;
 
         /**
          * Parents of target chromosome.
@@ -257,9 +257,12 @@ public final class BitSetChromosome implements IChromosome {
          *             if this builder is in invalid state
          */
         @Override
-        public final IChromosome build() throws IllegalStateException {
+        public final BitSetChromosome build() throws IllegalStateException {
             if (!isValid()) {
                 throw new IllegalStateException();
+            }
+            if (fitness == null) { // most common case
+                fitness = fitnessFunc.calcFitness(bitset);
             }
             return new BitSetChromosome(bitset, age, generation, fitness, parents.stream());
         }
@@ -285,10 +288,10 @@ public final class BitSetChromosome implements IChromosome {
             if (generation < 0) {
                 return false;
             }
-            if (fitness == null) {
+            if (fitness == null && fitnessFunc == null) {
                 return false;
             }
-            if (fitnessFunc == null) {
+            if (fitness != null && fitnessFunc != null) {
                 return false;
             }
             return true;
@@ -427,7 +430,7 @@ public final class BitSetChromosome implements IChromosome {
         @SuppressWarnings("hiding")
         @Override
         public final IChromosomeBuilder<BitSetChromosome, BitSet> fitnessFunc(
-            final IFitnessFunction<BitSetChromosome> fitnessFunc) {
+            final IFitnessFunction<BitSet> fitnessFunc) {
 
             Validators.nonNull(fitnessFunc);
             this.fitnessFunc = fitnessFunc;

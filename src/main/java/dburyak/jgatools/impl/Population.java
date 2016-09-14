@@ -281,7 +281,9 @@ public final class Population<C extends IChromosome> implements IPopulation<C> {
             }
             allChromosomes = allChromosomes.take(size);
             // subscription happens here, target population is the subscriber for all chromosomes (evaluate stats)
-            final List<C> chromosomesList = allChromosomes.toSortedList().toBlocking().single();
+            @SuppressWarnings("boxing") final List<C> chromosomesList = allChromosomes
+                .toSortedList((c1, c2) -> -c1.fitness().compareTo(c2.fitness()))
+                .toBlocking().single();
             Validators.isTrue(chromosomesList.size() == size);
             return new Population<>(props, chromosomesList, eliteCount);
         }

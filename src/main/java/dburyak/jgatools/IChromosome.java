@@ -107,7 +107,7 @@ public interface IChromosome {
     @NotThreadSafe
     public static interface IChromosomeBuilder<C extends IChromosome, D extends Cloneable>
         extends
-            InstanceBuilder<IChromosome> {
+            InstanceBuilder<C> {
 
         /**
          * Generate fingerprint of chromosome gene data.
@@ -216,7 +216,7 @@ public interface IChromosome {
          *            fitness calculation function
          * @return this builder (for call chaining)
          */
-        public IChromosomeBuilder<C, D> fitnessFunc(final IFitnessFunction<C> fitnessFunc);
+        public IChromosomeBuilder<C, D> fitnessFunc(final IFitnessFunction<D> fitnessFunc);
 
         /**
          * Add parent to target chromosome.
